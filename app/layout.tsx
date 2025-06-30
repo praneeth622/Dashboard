@@ -29,6 +29,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className={`${poppins.variable} ${inter.variable}`}>
+      <head>
+        <link rel="icon" href="/srnr_logo.jpeg" type="image/png" />
+        {/* You can use favicon.ico or any other image */}
+      </head>
       <body className="font-poppins antialiased">{children}</body>
     </html>
   )
