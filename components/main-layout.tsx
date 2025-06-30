@@ -1,8 +1,7 @@
 "use client"
 
 import type React from "react"
-
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Sidebar } from "./sidebar"
 import { Header } from "./header"
 
@@ -28,24 +27,55 @@ export function MainLayout({
   userInitials,
 }: MainLayoutProps) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const [isMobile, setIsMobile] = useState(false)
+
+  useEffect(() => {
+    const checkScreenSize = () => {
+      const mobile = window.innerWidth < 768
+      setIsMobile(mobile)
+      if (mobile) {
+        setSidebarCollapsed(true)
+      }
+    }
+
+    checkScreenSize()
+    window.addEventListener('resize', checkScreenSize)
+    
+    return () => window.removeEventListener('resize', checkScreenSize)
+  }, [])
+
+  const handleSidebarToggle = () => {
+    setSidebarCollapsed(!sidebarCollapsed)
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Sidebar collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} />
+      <Sidebar 
+        collapsed={sidebarCollapsed} 
+        onToggle={handleSidebarToggle} 
+      />
 
       {/* Main Content */}
-      <div className={`transition-all duration-300 ${sidebarCollapsed ? "ml-20" : "ml-72"}`}>
+      <div className={`
+        ${sidebarCollapsed 
+          ? "md:ml-20" 
+          : "md:ml-72"
+        }
+        ${isMobile ? "ml-0" : ""}
+      `}>
         <Header
           title={title}
           subtitle={subtitle}
-          onSidebarToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
+          onSidebarToggle={handleSidebarToggle}
           searchPlaceholder={searchPlaceholder}
           userName={userName}
           userEmail={userEmail}
           userAvatar={userAvatar}
           userInitials={userInitials}
         />
-        <div className="min-h-[calc(100vh-80px)]">{children}</div>
+        <div className="min-h-[calc(100vh-80px)]">
+          {children}
+        </div>
       </div>
     </div>
   )
