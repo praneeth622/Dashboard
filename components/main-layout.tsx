@@ -33,6 +33,8 @@ export function MainLayout({
     const checkScreenSize = () => {
       const mobile = window.innerWidth < 768
       setIsMobile(mobile)
+      
+      // On mobile, sidebar should be collapsed (hidden) by default
       if (mobile) {
         setSidebarCollapsed(true)
       }
@@ -52,16 +54,19 @@ export function MainLayout({
     <div className="min-h-screen bg-gray-50">
       <Sidebar 
         collapsed={sidebarCollapsed} 
-        onToggle={handleSidebarToggle} 
+        onToggle={handleSidebarToggle}
+        isMobile={isMobile}
       />
 
       {/* Main Content */}
       <div className={`
-        ${sidebarCollapsed 
-          ? "md:ml-20" 
-          : "md:ml-72"
+        min-h-screen
+        ${isMobile 
+          ? "ml-0 w-full" 
+          : sidebarCollapsed 
+            ? "ml-20" 
+            : "ml-72"
         }
-        ${isMobile ? "ml-0" : ""}
       `}>
         <Header
           title={title}
@@ -73,9 +78,9 @@ export function MainLayout({
           userAvatar={userAvatar}
           userInitials={userInitials}
         />
-        <div className="min-h-[calc(100vh-80px)]">
+        <main className="min-h-[calc(100vh-64px)] sm:min-h-[calc(100vh-80px)]">
           {children}
-        </div>
+        </main>
       </div>
     </div>
   )

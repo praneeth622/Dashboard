@@ -20,9 +20,10 @@ const sidebarItems = [
 interface SidebarProps {
     collapsed: boolean
     onToggle: () => void
+    isMobile?: boolean
 }
 
-export function Sidebar({ collapsed, onToggle }: SidebarProps) {
+export function Sidebar({ collapsed, onToggle, isMobile = false }: SidebarProps) {
     const pathname = usePathname()
 
     const isActive = (href: string) => {
@@ -35,7 +36,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
     const NavigationButton = ({ item }: { item: typeof sidebarItems[0] }) => {
         const buttonContent = (
             <div className="w-full">
-                <Link href={item.href}>
+                <Link href={item.href} onClick={isMobile ? onToggle : undefined}>
                     <Button
                         variant="ghost"
                         className={`
@@ -61,7 +62,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
             </div>
         )
 
-        if (collapsed) {
+        if (collapsed && !isMobile) {
             return (
                 <TooltipProvider>
                     <Tooltip delayDuration={300}>
@@ -81,10 +82,10 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
 
     return (
         <>
-            {/* Mobile Backdrop */}
-            {!collapsed && (
+            {/* Mobile Backdrop - Only show when sidebar is open on mobile */}
+            {isMobile && !collapsed && (
                 <div
-                    className="fixed inset-0 bg-black/50 z-30 md:hidden"
+                    className="fixed inset-0 bg-black/50 z-30"
                     onClick={onToggle}
                 />
             )}
@@ -94,6 +95,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
                 className={`
                     fixed left-0 top-0 z-40 h-screen bg-white border-r border-gray-200 shadow-xl
                     ${collapsed ? "w-20" : "w-72"}
+                    ${isMobile && collapsed ? "-translate-x-full" : "translate-x-0"}
                 `}
             >
                 <div className="flex flex-col h-full">
@@ -150,7 +152,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
 
                     {/* Logout Section */}
                     <div className={`border-t border-gray-100 ${collapsed ? "p-2" : "p-4"}`}>
-                        {collapsed ? (
+                        {collapsed && !isMobile ? (
                             <TooltipProvider>
                                 <Tooltip delayDuration={300}>
                                     <TooltipTrigger asChild>
@@ -166,23 +168,27 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
                                 </Tooltip>
                             </TooltipProvider>
                         ) : (
-                            <Link href="/logout">
+                            <Link href="/logout" onClick={isMobile ? onToggle : undefined}>
                                 <button className="w-full flex items-center space-x-3 px-4 py-3 text-red-600 hover:bg-red-50 rounded-xl">
                                     <LogOut className="w-5 h-5 flex-shrink-0" />
-                                    <span className="font-medium">
-                                        Logout
-                                    </span>
+                                    {!collapsed && (
+                                        <span className="font-medium">
+                                            Logout
+                                        </span>
+                                    )}
                                 </button>
                             </Link>
                         )}
                     </div>
                 </div>
 
-                {/* Desktop Resize Handle */}
-                <div 
-                    className="absolute right-0 top-0 w-1 h-full cursor-col-resize bg-transparent hover:bg-blue-500/20 hidden md:block"
-                    onDoubleClick={onToggle}
-                />
+                {/* Desktop Resize Handle - Only on desktop */}
+                {!isMobile && (
+                    <div 
+                        className="absolute right-0 top-0 w-1 h-full cursor-col-resize bg-transparent hover:bg-blue-500/20"
+                        onDoubleClick={onToggle}
+                    />
+                )}
             </aside>
         </>
     )
