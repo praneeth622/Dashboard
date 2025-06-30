@@ -1,378 +1,283 @@
 "use client"
 
-import { useState, useMemo } from "react"
-import { motion } from "framer-motion"
-import { Calendar, momentLocalizer, Views } from "react-big-calendar"
-import moment from "moment"
-import { Clock, Plus, Eye, Circle } from "lucide-react"
+import { useState } from "react"
+import { ChevronRight, ChevronLeft, Plus, X, Eye } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import "react-big-calendar/lib/css/react-big-calendar.css"
+import { Calendar } from "@/components/ui/calendar"
 import { MainLayout } from "@/components/main-layout"
+import LeaveApplication from "@/components/LeaveApplication"
+import { addMonths, subMonths, format } from "date-fns"
 
-const localizer = momentLocalizer(moment)
-
-const holidays = [
-  { date: "Jan 26", name: "Republic Day", color: "bg-red-100 text-red-700" },
-  { date: "Mar 8", name: "Holi", color: "bg-pink-100 text-pink-700" },
-  { date: "Mar 29", name: "Good Friday", color: "bg-blue-100 text-blue-700" },
-  { date: "Apr 14", name: "Baisakhi", color: "bg-yellow-100 text-yellow-700" },
-  { date: "May 1", name: "Labour Day", color: "bg-green-100 text-green-700" },
-  { date: "Aug 15", name: "Independence Day", color: "bg-orange-100 text-orange-700" },
-  { date: "Oct 2", name: "Gandhi Jayanti", color: "bg-indigo-100 text-indigo-700" },
-  { date: "Nov 12", name: "Diwali", color: "bg-purple-100 text-purple-700" },
-  { date: "Dec 25", name: "Christmas", color: "bg-red-100 text-red-700" },
-]
-
-const leaveRequests = [
-  {
-    duration: "Jan 15 - Jan 17",
-    type: "Casual Leave",
-    days: 3,
-    status: "Approved",
-    details: "Family function",
-  },
-  {
-    duration: "Feb 5 - Feb 6",
-    type: "Sick Leave",
-    days: 2,
-    status: "Pending",
-    details: "Medical checkup",
-  },
-  {
-    duration: "Mar 10 - Mar 12",
-    type: "Casual Leave",
-    days: 3,
-    status: "Approved",
-    details: "Personal work",
-  },
-  {
-    duration: "Apr 2 - Apr 4",
-    type: "Holiday Leave",
-    days: 3,
-    status: "Pending",
-    details: "Extended weekend",
-  },
-]
-
-const todayActivity = [
-  { time: "09:15 AM", activity: "Checked In", type: "checkin" },
-  { time: "01:00 PM", activity: "Lunch Break", type: "break" },
-  { time: "02:00 PM", activity: "Back from Lunch", type: "checkin" },
-  { time: "06:30 PM", activity: "Checked Out", type: "checkout" },
-]
-
-// Generate calendar events
-const generateCalendarEvents = () => {
-  const events = []
-  const today = new Date()
-
-  // Add some sample events
-  for (let i = 0; i < 30; i++) {
-    const date = new Date(today)
-    date.setDate(today.getDate() + i - 15)
-
-    // Work day events
-    if (date.getDay() !== 0 && date.getDay() !== 6) {
-      const loginTime = new Date(date)
-      loginTime.setHours(9, 15, 0)
-
-      const logoutTime = new Date(date)
-      logoutTime.setHours(18, 30, 0)
-
-      events.push({
-        id: `work-${i}`,
-        title: "Work Day",
-        start: loginTime,
-        end: logoutTime,
-        resource: {
-          type: "work",
-          status: Math.random() > 0.8 ? "SL" : Math.random() > 0.9 ? "CL" : "O",
-        },
-      })
+// Leave Details Modal Component
+function LeaveDetailsModal({ 
+  request, 
+  onClose 
+}: { 
+  request: any; 
+  onClose: () => void; 
+}) {
+  const getStatusColor = (status: string) => {
+    switch (status.toLowerCase()) {
+      case 'approved': return 'text-green-600 bg-green-50';
+      case 'pending': return 'text-yellow-600 bg-yellow-50';
+      case 'rejected': return 'text-red-600 bg-red-50';
+      default: return 'text-gray-600 bg-gray-50';
     }
-
-    // Add some leave events
-    if (Math.random() > 0.85) {
-      events.push({
-        id: `leave-${i}`,
-        title: "Leave",
-        start: new Date(date.setHours(0, 0, 0)),
-        end: new Date(date.setHours(23, 59, 59)),
-        resource: {
-          type: "leave",
-          status: Math.random() > 0.5 ? "CL" : "SL",
-        },
-      })
-    }
-  }
-
-  return events
-}
-
-const HolidayList = () => (
-  <Card className="shadow-lg border-0 h-full">
-    <CardHeader>
-      <CardTitle className="font-poppins text-xl">Upcoming Holidays</CardTitle>
-    </CardHeader>
-    <CardContent className="space-y-4 overflow-y-auto max-h-[500px]">
-      {holidays.map((holiday, index) => (
-        <motion.div
-          key={index}
-          className="flex items-center justify-between p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors"
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: index * 0.1 }}
-        >
-          <div>
-            <p className="font-inter font-medium text-gray-900">{holiday.date}</p>
-            <Badge className={`mt-1 ${holiday.color} border-0`}>{holiday.name}</Badge>
-          </div>
-        </motion.div>
-      ))}
-    </CardContent>
-  </Card>
-)
-
-const DynamicCalendar = ({
-  events,
-  selectedDate,
-  onSelectDate,
-}: {
-  events: any[]
-  selectedDate: Date
-  onSelectDate: (date: Date) => void
-}) => {
-  const eventStyleGetter = (event: any) => {
-    let backgroundColor = "#3174ad"
-    let borderColor = "#3174ad"
-
-    if (event.resource?.status === "SL") {
-      backgroundColor = "#f59e0b"
-      borderColor = "#f59e0b"
-    } else if (event.resource?.status === "CL") {
-      backgroundColor = "#3b82f6"
-      borderColor = "#3b82f6"
-    } else if (event.resource?.status === "HL") {
-      backgroundColor = "#8b5cf6"
-      borderColor = "#8b5cf6"
-    } else if (event.resource?.status === "A") {
-      backgroundColor = "#ef4444"
-      borderColor = "#ef4444"
-    } else if (event.resource?.status === "O") {
-      backgroundColor = "#10b981"
-      borderColor = "#10b981"
-    }
-
-    return {
-      style: {
-        backgroundColor,
-        borderColor,
-        color: "white",
-        border: "none",
-        borderRadius: "6px",
-        fontSize: "12px",
-        padding: "2px 6px",
-      },
-    }
-  }
-
+  };
+  
   return (
-    <Card className="shadow-lg border-0 h-full">
-      <CardHeader>
-        <CardTitle className="font-poppins text-xl">Calendar View</CardTitle>
-      </CardHeader>
-      <CardContent className="h-[600px]">
-        <div className="h-full">
-          <Calendar
-            localizer={localizer}
-            events={events}
-            startAccessor="start"
-            endAccessor="end"
-            style={{ height: "100%" }}
-            eventPropGetter={eventStyleGetter}
-            onSelectSlot={({ start }) => onSelectDate(start)}
-            onSelectEvent={(event) => onSelectDate(event.start)}
-            selectable
-            views={[Views.MONTH, Views.WEEK, Views.DAY]}
-            defaultView={Views.MONTH}
-            popup
-            className="custom-calendar"
-          />
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg max-w-md w-full max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between p-6 border-b">
+          <h2 className="text-xl font-semibold text-gray-900">Leave Request Details</h2>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onClose}
+            className="h-8 w-8 p-0"
+          >
+            <X className="h-4 w-4" />
+          </Button>
         </div>
+        
+        <div className="p-6 space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="text-sm font-medium text-gray-700 block mb-1">
+                Start Date:
+              </label>
+              <p className="text-sm text-gray-900 font-medium">1 Jan, 2024</p>
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700 block mb-1">
+                End Date:
+              </label>
+              <p className="text-sm text-gray-900 font-medium">3 Jan, 2024</p>
+            </div>
+          </div>
 
-        {/* Legend */}
-        <div className="flex items-center justify-center space-x-4 mt-4 pt-4 border-t border-gray-100">
-          <div className="flex items-center space-x-1">
-            <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-            <span className="text-xs text-gray-600">On-time (O)</span>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="text-sm font-medium text-gray-700 block mb-1">
+                Type:
+              </label>
+              <p className="text-sm text-gray-900 font-medium">{request.type}</p>
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700 block mb-1">
+                Days:
+              </label>
+              <p className="text-sm text-gray-900 font-medium">{request.days} days</p>
+            </div>
           </div>
-          <div className="flex items-center space-x-1">
-            <div className="w-3 h-3 bg-red-500 rounded-full"></div>
-            <span className="text-xs text-gray-600">Absent (A)</span>
+
+          <div>
+            <label className="text-sm font-medium text-gray-700 block mb-2">
+              Description:
+            </label>
+            <div className="bg-gray-50 p-3 rounded-lg">
+              <p className="text-sm font-medium text-gray-900 mb-2">
+                Subject: Sick leave application for office fever
+              </p>
+              <p className="text-sm text-gray-700 leading-relaxed">
+                I am writing to seek leave from work due to a severe fever. (mention the specific symptoms of fever). Accordingly, consulting with a doctor, I have been advised to take rest for a day to recover. So, I request you to kindly approve my leave application for [date], and I will join the office from the next day.
+              </p>
+            </div>
           </div>
-          <div className="flex items-center space-x-1">
-            <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
-            <span className="text-xs text-gray-600">Sick Leave (SL)</span>
+
+          <div>
+            <label className="text-sm font-medium text-gray-700 block mb-1">
+              Status:
+            </label>
+            <span className={`inline-flex px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(request.status)}`}>
+              {request.status}
+            </span>
           </div>
-          <div className="flex items-center space-x-1">
-            <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
-            <span className="text-xs text-gray-600">Casual Leave (CL)</span>
-          </div>
-          <div className="flex items-center space-x-1">
-            <div className="w-3 h-3 bg-purple-500 rounded-full"></div>
-            <span className="text-xs text-gray-600">Holiday Leave (HL)</span>
+
+          <div className="flex justify-end pt-4 border-t">
+            <Button variant="outline" onClick={onClose}>
+              Close
+            </Button>
           </div>
         </div>
-      </CardContent>
-    </Card>
-  )
+      </div>
+    </div>
+  );
 }
-
-const TodayActivityPanel = ({ selectedDate }: { selectedDate: Date }) => (
-  <div className="space-y-6">
-    {/* Login/Logout Times */}
-    <Card className="shadow-lg border-0">
-      <CardContent className="p-6">
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-green-100 rounded-xl flex items-center justify-center">
-                <Clock className="w-5 h-5 text-green-600" />
-              </div>
-              <div>
-                <p className="font-inter text-sm text-gray-600">Login Time</p>
-                <p className="font-poppins font-bold text-lg text-gray-900">09:15 AM</p>
-              </div>
-            </div>
-          </div>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center">
-                <Clock className="w-5 h-5 text-blue-600" />
-              </div>
-              <div>
-                <p className="font-inter text-sm text-gray-600">Logout Time</p>
-                <p className="font-poppins font-bold text-lg text-gray-900">06:30 PM</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-
-    {/* Today Activity */}
-    <Card className="shadow-lg border-0">
-      <CardHeader>
-        <CardTitle className="font-poppins text-lg">
-          Activity for {moment(selectedDate).format("MMM DD, YYYY")}
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        {todayActivity.map((activity, index) => (
-          <div key={index} className="flex items-center space-x-3">
-            <Circle
-              className={`w-3 h-3 ${
-                activity.type === "checkin"
-                  ? "text-green-500 fill-green-500"
-                  : activity.type === "checkout"
-                    ? "text-red-500 fill-red-500"
-                    : "text-yellow-500 fill-yellow-500"
-              }`}
-            />
-            <div className="flex-1">
-              <p className="font-inter text-sm text-gray-900">{activity.activity}</p>
-              <p className="text-xs text-gray-500">{activity.time}</p>
-            </div>
-          </div>
-        ))}
-      </CardContent>
-    </Card>
-
-    {/* Apply for Leave Button */}
-    <Button className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white py-3 rounded-xl shadow-lg">
-      <Plus className="w-4 h-4 mr-2" />
-      Apply for Leave
-    </Button>
-  </div>
-)
-
-const LeaveSummaryCards = () => (
-  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-    <Card className="bg-gradient-to-br from-purple-50 to-purple-100 border-0 shadow-lg">
-      <CardContent className="p-6 text-center">
-        <h3 className="font-poppins font-bold text-2xl text-purple-700">10</h3>
-        <p className="font-inter text-purple-600">Casual Leaves Left</p>
-      </CardContent>
-    </Card>
-    <Card className="bg-gradient-to-br from-orange-50 to-orange-100 border-0 shadow-lg">
-      <CardContent className="p-6 text-center">
-        <h3 className="font-poppins font-bold text-2xl text-orange-700">8</h3>
-        <p className="font-inter text-orange-600">Sick Leaves Left</p>
-      </CardContent>
-    </Card>
-    <Card className="bg-gradient-to-br from-green-50 to-green-100 border-0 shadow-lg">
-      <CardContent className="p-6 text-center">
-        <h3 className="font-poppins font-bold text-2xl text-green-700">5</h3>
-        <p className="font-inter text-green-600">Holiday Leaves Left</p>
-      </CardContent>
-    </Card>
-  </div>
-)
-
-const LeaveRequestTable = () => (
-  <Card className="shadow-lg border-0">
-    <CardHeader>
-      <CardTitle className="font-poppins text-xl">Leave Requests</CardTitle>
-    </CardHeader>
-    <CardContent>
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead className="font-inter font-medium">Duration</TableHead>
-            <TableHead className="font-inter font-medium">Type</TableHead>
-            <TableHead className="font-inter font-medium">Days</TableHead>
-            <TableHead className="font-inter font-medium">Status</TableHead>
-            <TableHead className="font-inter font-medium">Details</TableHead>
-            <TableHead className="font-inter font-medium">Action</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {leaveRequests.map((request, index) => (
-            <TableRow key={index}>
-              <TableCell className="font-medium">{request.duration}</TableCell>
-              <TableCell>{request.type}</TableCell>
-              <TableCell>{request.days}</TableCell>
-              <TableCell>
-                <Badge
-                  variant="secondary"
-                  className={
-                    request.status === "Approved" ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"
-                  }
-                >
-                  {request.status}
-                </Badge>
-              </TableCell>
-              <TableCell>{request.details}</TableCell>
-              <TableCell>
-                <Button variant="ghost" size="sm" className="text-blue-600 hover:text-blue-700">
-                  <Eye className="w-4 h-4 mr-1" />
-                  See more
-                </Button>
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </CardContent>
-  </Card>
-)
 
 export default function CalendarPage() {
-  const [selectedDate, setSelectedDate] = useState(new Date())
-  const events = useMemo(() => generateCalendarEvents(), [])
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [currentMonth, setCurrentMonth] = useState<Date>(new Date());
+  const [showLeaveForm, setShowLeaveForm] = useState(false);
+  const [selectedRequest, setSelectedRequest] = useState<any>(null);
+
+  // Holiday data
+  const holidays = [
+    { date: 'Jan 26', name: 'Republic Day' },
+    { date: 'Mar 8', name: 'Holi' },
+    { date: 'Mar 29', name: 'Good Friday' },
+    { date: 'Apr 14', name: 'Baisakhi' },
+    { date: 'May 1', name: 'Labour Day' },
+    { date: 'Aug 15', name: 'Independence Day' },
+    { date: 'Oct 2', name: 'Gandhi Jayanti' },
+    { date: 'Nov 12', name: 'Diwali' },
+    { date: 'Dec 25', name: 'Christmas' },
+  ];
+
+  // Leave data
+  const leaveData = {
+    casualLeavesLeft: 10,
+    sickLeavesLeft: 8,
+    holidayLeavesLeft: 5
+  };
+
+  // Activity data
+  const activities = [
+    { time: '09:15 AM', activity: 'Checked In' },
+    { time: '01:00 PM', activity: 'Lunch Break' },
+    { time: '02:00 PM', activity: 'Back from Lunch' },
+    { time: '06:30 PM', activity: 'Checked Out' },
+  ];
+
+  // Leave requests data
+  const leaveRequests = [
+    {
+      duration: 'Jan 15 - Jan 17',
+      type: 'Casual Leave',
+      days: 3,
+      status: 'Approved',
+      details: 'Family function',
+      action: 'See more'
+    },
+    {
+      duration: 'Feb 5 - Feb 6',
+      type: 'Sick Leave',
+      days: 2,
+      status: 'Pending',
+      details: 'Medical checkup',
+      action: 'See more'
+    },
+    {
+      duration: 'Mar 10 - Mar 12',
+      type: 'Casual Leave',
+      days: 3,
+      status: 'Approved',
+      details: 'Personal work',
+      action: 'See more'
+    },
+    {
+      duration: 'Apr 2 - Apr 4',
+      type: 'Holiday Leave',
+      days: 3,
+      status: 'Pending',
+      details: 'Extended weekend',
+      action: 'See more'
+    },
+  ];
+
+  // Enhanced calendar events with multiple events per day
+  const calendarEvents: Record<string, Array<{
+    type: string;
+    label: string;
+    status: string;
+    color: string;
+  }>> = {
+    '2025-01-02': [
+      { type: 'holiday', label: 'New Year Holiday', status: 'Holiday', color: 'bg-purple-500' }
+    ],
+    '2025-01-15': [
+      { type: 'casual', label: 'Casual Leave', status: 'Casual Leave', color: 'bg-blue-500' }
+    ],
+    '2025-01-16': [
+      { type: 'casual', label: 'Casual Leave', status: 'Casual Leave', color: 'bg-blue-500' }
+    ],
+    '2025-01-17': [
+      { type: 'casual', label: 'Casual Leave', status: 'Casual Leave', color: 'bg-blue-500' }
+    ],
+    '2025-01-20': [
+      { type: 'sick', label: 'Sick Leave', status: 'Sick Leave', color: 'bg-yellow-500' }
+    ],
+    '2025-01-26': [
+      { type: 'holiday', label: 'Republic Day', status: 'Holiday', color: 'bg-purple-500' }
+    ],
+    '2025-01-28': [
+      { type: 'present', label: 'On Time', status: 'Present', color: 'bg-green-500' }
+    ],
+    '2025-01-29': [
+      { type: 'absent', label: 'Absent', status: 'Absent', color: 'bg-red-500' }
+    ],
+    '2025-02-05': [
+      { type: 'sick', label: 'Sick Leave', status: 'Sick Leave', color: 'bg-yellow-500' }
+    ],
+    '2025-02-06': [
+      { type: 'sick', label: 'Sick Leave', status: 'Sick Leave', color: 'bg-yellow-500' }
+    ],
+    '2025-02-14': [
+      { type: 'holidayleave', label: 'Holiday Leave', status: 'Holiday Leave', color: 'bg-indigo-500' }
+    ],
+    '2025-03-08': [
+      { type: 'holiday', label: 'Holi', status: 'Holiday', color: 'bg-purple-500' }
+    ],
+    '2025-03-10': [
+      { type: 'casual', label: 'Casual Leave', status: 'Casual Leave', color: 'bg-blue-500' }
+    ],
+    '2025-03-11': [
+      { type: 'casual', label: 'Casual Leave', status: 'Casual Leave', color: 'bg-blue-500' }
+    ],
+    '2025-03-12': [
+      { type: 'casual', label: 'Casual Leave', status: 'Casual Leave', color: 'bg-blue-500' }
+    ],
+    '2025-06-15': [
+      { type: 'casual', label: 'Casual Leave', status: 'Casual Leave', color: 'bg-blue-500' },
+      { type: 'meeting', label: 'Team Meeting', status: 'Meeting', color: 'bg-orange-500' }
+    ],
+    '2025-06-20': [
+      { type: 'sick', label: 'Sick Leave', status: 'Sick Leave', color: 'bg-yellow-500' }
+    ],
+    '2025-06-25': [
+      { type: 'holidayleave', label: 'Holiday Leave', status: 'Holiday Leave', color: 'bg-indigo-500' }
+    ],
+    '2025-06-30': [
+      { type: 'present', label: 'Present', status: 'Present', color: 'bg-green-500' }
+    ],
+  };
+
+  const getEventsForDate = (date: Date) => {
+    const dateStr = date.toISOString().split('T')[0];
+    return calendarEvents[dateStr] || [];
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status.toLowerCase()) {
+      case 'approved': return 'text-green-600 bg-green-50';
+      case 'pending': return 'text-yellow-600 bg-yellow-50';
+      case 'rejected': return 'text-red-600 bg-red-50';
+      default: return 'text-gray-600 bg-gray-50';
+    }
+  };
+
+  const handleSeeMore = (request: any) => {
+    setSelectedRequest(request);
+  };
+
+  // Navigation functions
+  const goToToday = () => {
+    const today = new Date();
+    setSelectedDate(today);
+    setCurrentMonth(today);
+  };
+
+  const goToPreviousMonth = () => {
+    const previousMonth = subMonths(currentMonth, 1);
+    setCurrentMonth(previousMonth);
+  };
+
+  const goToNextMonth = () => {
+    const nextMonth = addMonths(currentMonth, 1);
+    setCurrentMonth(nextMonth);
+  };
 
   return (
     <MainLayout
@@ -384,129 +289,307 @@ export default function CalendarPage() {
       userInitials="JD"
     >
       {/* Calendar Content */}
-      <main className="p-8 space-y-8">
-        {/* 3-Column Layout */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-          {/* Left Column - Holidays List */}
-          <motion.div
-            className="lg:col-span-3"
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.5 }}
-          >
-            <HolidayList />
-          </motion.div>
+      <div className="p-4 md:p-6 space-y-6">
+        <div className="max-w-full mx-auto space-y-6">
+          {/* Main Content Grid */}
+          <div className="grid grid-cols-1 xl:grid-cols-4 gap-4 md:gap-6">
+            {/* Left Sidebar - Holidays */}
+            <div className="xl:col-span-1">
+              <Card className="shadow-sm h-fit">
+                <CardHeader className="pb-4">
+                  <CardTitle className="text-lg font-semibold">Upcoming Holidays</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {holidays.map((holiday, index) => (
+                    <div key={index} className="flex justify-between items-center py-2 border-b border-gray-50 last:border-b-0">
+                      <div>
+                        <p className="font-medium text-gray-900 text-sm">{holiday.name}</p>
+                        <p className="text-xs text-blue-600">{holiday.date}</p>
+                      </div>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            </div>
 
-          {/* Center Column - Dynamic Calendar */}
-          <motion.div
-            className="lg:col-span-6"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.2 }}
-          >
-            <DynamicCalendar events={events} selectedDate={selectedDate} onSelectDate={setSelectedDate} />
-          </motion.div>
+            {/* Center - Calendar */}
+            <div className="xl:col-span-2">
+              <Card className="shadow-sm">
+                <CardHeader className="pb-4">
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                    <CardTitle className="text-lg font-semibold">
+                      Calendar View - {format(currentMonth, 'MMMM yyyy')}
+                    </CardTitle>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="text-xs hover:bg-blue-50 hover:text-blue-600"
+                        onClick={goToToday}
+                      >
+                        Today
+                      </Button>
+                      <div className="flex items-center">
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="p-2 hover:bg-gray-100"
+                          onClick={goToPreviousMonth}
+                        >
+                          <ChevronLeft className="w-4 h-4" />
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="text-xs px-2 hover:bg-gray-100"
+                          onClick={goToPreviousMonth}
+                        >
+                          Back
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="text-xs px-2 hover:bg-gray-100"
+                          onClick={goToNextMonth}
+                        >
+                          Next
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="p-2 hover:bg-gray-100"
+                          onClick={goToNextMonth}
+                        >
+                          <ChevronRight className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                  
+                </CardHeader>
+                <CardContent>
+                  {/* Legend */}
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2 mb-6 p-3 bg-gray-50 rounded-lg">
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 bg-green-500 rounded flex-shrink-0"></div>
+                      <span className="text-xs">Present</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 bg-red-500 rounded flex-shrink-0"></div>
+                      <span className="text-xs">Absent</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 bg-yellow-500 rounded flex-shrink-0"></div>
+                      <span className="text-xs">Sick Leave</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 bg-blue-500 rounded flex-shrink-0"></div>
+                      <span className="text-xs">Casual Leave</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 bg-indigo-500 rounded flex-shrink-0"></div>
+                      <span className="text-xs">Holiday Leave</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 bg-purple-500 rounded flex-shrink-0"></div>
+                      <span className="text-xs">Holiday</span>
+                    </div>
+                  </div>
 
-          {/* Right Column - Activity Panel */}
-          <motion.div
-            className="lg:col-span-3"
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.5, delay: 0.4 }}
-          >
-            <TodayActivityPanel selectedDate={selectedDate} />
-          </motion.div>
+                  {/* Enhanced Calendar */}
+                  <div className="flex justify-center">
+                    <Calendar
+                      mode="single"
+                      selected={selectedDate}
+                      onSelect={(date) => date && setSelectedDate(date)}
+                      month={currentMonth}
+                      onMonthChange={setCurrentMonth}
+                      className="rounded-md border bg-white p-4 w-full max-w-none"
+                      classNames={{
+                        months: "flex flex-col space-y-4 w-full",
+                        month: "space-y-4 w-full",
+                        caption: "flex justify-center pt-1 relative items-center mb-4",
+                        caption_label: "text-xl font-semibold",
+                        nav: "space-x-1 flex items-center",
+                        nav_button: "h-10 w-10 bg-transparent p-0 opacity-50 hover:opacity-100 border rounded-md",
+                        nav_button_previous: "absolute left-1",
+                        nav_button_next: "absolute right-1",
+                        table: "w-full border-collapse space-y-1",
+                        head_row: "flex w-full",
+                        head_cell: "text-muted-foreground rounded-md flex-1 h-12 font-medium text-sm flex items-center justify-center",
+                        row: "flex w-full mt-2",
+                        cell: "flex-1 h-24 text-center text-sm p-1 relative focus-within:relative focus-within:z-20 border border-gray-100",
+                        day: "h-full w-full p-1 font-normal hover:bg-accent hover:text-accent-foreground rounded-md relative flex flex-col items-start justify-start",
+                        day_selected: "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground",
+                        day_today: "bg-accent text-accent-foreground font-semibold",
+                        day_outside: "text-muted-foreground opacity-50",
+                        day_disabled: "text-muted-foreground opacity-50",
+                      }}
+                      components={{
+                        DayContent: ({ date }: { date: Date }) => {
+                          const events = getEventsForDate(date);
+                          return (
+                            <div className="relative w-full h-full flex flex-col">
+                              <span className="text-sm font-medium mb-1">{date.getDate()}</span>
+                              <div className="flex-1 space-y-1 overflow-hidden">
+                                {events.slice(0, 2).map((event, index) => (
+                                  <div
+                                    key={index}
+                                    className={`text-xs px-1 py-0.5 rounded text-white truncate ${event.color}`}
+                                    title={event.label}
+                                  >
+                                    {event.status.length > 6 ? event.status.substring(0, 6) + '...' : event.status}
+                                  </div>
+                                ))}
+                                {events.length > 2 && (
+                                  <div className="text-xs text-gray-500 font-medium">
+                                    +{events.length - 2}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        }
+                      }}
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Right Sidebar */}
+            <div className="xl:col-span-1 space-y-4">
+              {/* Login/Logout Times */}
+              <Card className="shadow-sm">
+                <CardContent className="p-4 space-y-3">
+                  <div className="bg-green-50 p-3 rounded-lg">
+                    <p className="text-xs font-medium text-green-700">Login Time</p>
+                    <p className="text-lg font-bold text-green-600">09:15 AM</p>
+                  </div>
+                  <div className="bg-red-50 p-3 rounded-lg">
+                    <p className="text-xs font-medium text-red-700">Logout Time</p>
+                    <p className="text-lg font-bold text-red-600">06:30 PM</p>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Activity Card */}
+              <Card className="shadow-sm">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-semibold">Activity for {selectedDate.toLocaleDateString()}</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  {activities.map((activity, index) => (
+                    <div key={index} className="flex justify-between items-center py-1.5 border-b border-gray-50 last:border-b-0">
+                      <span className="font-medium text-gray-900 text-xs">{activity.activity}</span>
+                      <span className="text-xs text-gray-600">{activity.time}</span>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+
+              {/* Apply for Leave - Updated styling */}
+              <Card className="shadow-sm border-l-4 border-l-blue-500 bg-gradient-to-r from-blue-50 to-white">
+                <CardContent className="p-4">
+                  <Button 
+                    onClick={() => setShowLeaveForm(true)}
+                    className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 text-sm font-medium"
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    Apply for Leave
+                  </Button>
+                </CardContent>
+              </Card>
+
+              {/* Leave Balance Cards */}
+              <div className="space-y-3">
+                <Card className="bg-green-500 text-white shadow-sm">
+                  <CardContent className="p-3 text-center">
+                    <p className="text-2xl font-bold">{leaveData.casualLeavesLeft}</p>
+                    <p className="text-xs">Casual Leaves Left</p>
+                  </CardContent>
+                </Card>
+                
+                <Card className="bg-yellow-500 text-white shadow-sm">
+                  <CardContent className="p-3 text-center">
+                    <p className="text-2xl font-bold">{leaveData.sickLeavesLeft}</p>
+                    <p className="text-xs">Sick Leaves Left</p>
+                  </CardContent>
+                </Card>
+                
+                <Card className="bg-purple-500 text-white shadow-sm">
+                  <CardContent className="p-3 text-center">
+                    <p className="text-2xl font-bold">{leaveData.holidayLeavesLeft}</p>
+                    <p className="text-xs">Holiday Leaves Left</p>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+          </div>
+
+          {/* Leave Requests Table */}
+          <Card className="shadow-sm">
+            <CardHeader className="pb-4">
+              <CardTitle className="text-lg font-semibold">Leave Requests</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="text-xs">Duration</TableHead>
+                      <TableHead className="text-xs">Type</TableHead>
+                      <TableHead className="text-xs">Days</TableHead>
+                      <TableHead className="text-xs">Status</TableHead>
+                      <TableHead className="text-xs">Details</TableHead>
+                      <TableHead className="text-xs">Action</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {leaveRequests.map((request, index) => (
+                      <TableRow key={index}>
+                        <TableCell className="font-medium text-xs">{request.duration}</TableCell>
+                        <TableCell className="text-xs">{request.type}</TableCell>
+                        <TableCell className="text-xs">{request.days}</TableCell>
+                        <TableCell>
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(request.status)}`}>
+                            {request.status}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-xs">{request.details}</TableCell>
+                        <TableCell>
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="text-xs hover:bg-blue-50 hover:text-blue-600 transition-colors duration-200"
+                            onClick={() => handleSeeMore(request)}
+                          >
+                            <Eye className="w-3 h-3 mr-1" />
+                            {request.action}
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Leave Application Modal */}
+          {showLeaveForm && (
+            <LeaveApplication onClose={() => setShowLeaveForm(false)} />
+          )}
+
+          {/* Leave Details Modal */}
+          {selectedRequest && (
+            <LeaveDetailsModal
+              request={selectedRequest}
+              onClose={() => setSelectedRequest(null)}
+            />
+          )}
         </div>
-
-        {/* Leave Balance Summary */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.6 }}
-        >
-          <LeaveSummaryCards />
-        </motion.div>
-
-        {/* Leave Request Table */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.8 }}
-        >
-          <LeaveRequestTable />
-        </motion.div>
-      </main>
-
-      <style jsx global>{`
-        .custom-calendar {
-          font-family: 'Inter', system-ui, sans-serif;
-        }
-        
-        .custom-calendar .rbc-header {
-          background-color: #f8fafc;
-          border-bottom: 1px solid #e2e8f0;
-          padding: 12px 8px;
-          font-weight: 600;
-          color: #374151;
-        }
-        
-        .custom-calendar .rbc-today {
-          background-color: #dbeafe;
-        }
-        
-        .custom-calendar .rbc-off-range-bg {
-          background-color: #f9fafb;
-        }
-        
-        .custom-calendar .rbc-event {
-          border-radius: 6px;
-          border: none;
-          font-size: 11px;
-          padding: 2px 6px;
-        }
-        
-        .custom-calendar .rbc-toolbar {
-          margin-bottom: 20px;
-        }
-        
-        .custom-calendar .rbc-toolbar button {
-          background: white;
-          border: 1px solid #d1d5db;
-          border-radius: 8px;
-          padding: 8px 16px;
-          margin: 0 4px;
-          font-weight: 500;
-          color: #374151;
-          transition: all 0.2s;
-        }
-        
-        .custom-calendar .rbc-toolbar button:hover {
-          background: #f3f4f6;
-          border-color: #9ca3af;
-        }
-        
-        .custom-calendar .rbc-toolbar button.rbc-active {
-          background: #3b82f6;
-          border-color: #3b82f6;
-          color: white;
-        }
-        
-        .custom-calendar .rbc-month-view {
-          border: 1px solid #e5e7eb;
-          border-radius: 12px;
-          overflow: hidden;
-        }
-        
-        .custom-calendar .rbc-date-cell {
-          padding: 8px;
-          text-align: right;
-        }
-        
-        .custom-calendar .rbc-date-cell > a {
-          color: #374151;
-          font-weight: 500;
-        }
-      `}</style>
+      </div>
     </MainLayout>
   )
 }
